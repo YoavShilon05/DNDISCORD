@@ -3,7 +3,8 @@ import Item
 from Weapon import Weapon
 from typing import *
 
-class Inventory():
+
+class Inventory(list):
 
     def __init__(self, owner, weaponSlots : int, itemSlots : int):
         super().__init__()
@@ -15,20 +16,6 @@ class Inventory():
         self.items = List[Item.Item]
         self.weapons = []
         self.items = []
-
-    def Append(self, item : Item.Item) -> None:
-
-        if type(item) == Weapon:
-            if len(self.weapons) < self.weaponSlots:
-                self.weapons.append(item)
-                return
-
-        else:
-            if len(self.items) < self.itemSlots:
-                self.items.append(item)
-                return
-
-        raise Exception("Inventory is full")
 
     def Preview(self):
         spaces = 8
@@ -45,7 +32,6 @@ class Inventory():
                 self.items.remove(item)
                 del item
 
-
     def __getitem__(self, index : int):
         inv = self.weapons.extend(self.items)
         return inv[index]
@@ -54,11 +40,4 @@ class Inventory():
         return self.Preview()
     def __repr__(self):
         return self.Preview()
-
-
-import Item
-from Weapon import Weapon
-from typing import *
-
-
 
