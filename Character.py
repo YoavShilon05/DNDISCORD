@@ -1,16 +1,25 @@
-import Inventory
+from Inventory import Inventory
+import enum
+
+class Sexes(enum.Enum):
+    male = 0
+    female = 1
+    unknown = 2
+
+
 
 class Entity:
-    def __init__(self, name, damage, backstory=""):
+    def __init__(self, name, sex : Sexes, backstory=""):
         self.name = name
-        self.damage = damage
+        self.sex = sex
 
         #TODO: make health & dmage be affected by races & profession.
-
         self.maxHealth = 25
         self._health = 5
+        self.damage = 15
+
         self.backstory = backstory
-        self.inventory = Inventory.Inventory(self, 2, 7)
+        self.inventory = Inventory(self, 2, 7)
         self.mainWeapon = None
 
     def _HealthGetter(self):
@@ -27,8 +36,8 @@ class Entity:
 
 class Character(Entity):
 
-    def __init__(self, name, race, profession, backstory=""):
-        super().__init__(name, backstory)
+    def __init__(self, name, sex, race, profession, backstory=""):
+        super().__init__(name, sex, backstory)
 
         self.race = race
         self.profession = profession

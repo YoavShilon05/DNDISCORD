@@ -12,7 +12,7 @@ class Buffer:
 
 class RaceBuffer(Buffer):
 
-    def __init__(self, name, damage, races : List[Races.races], description=""):
+    def __init__(self, name, damage, races : List[Races.Races], description=""):
 
         super().__init__(name, damage, description)
 

@@ -1,6 +1,10 @@
-from Inventory import Inventory
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from inspect import iscoroutinefunction, getfullargspec
 from uuid import uuid1
+
+if TYPE_CHECKING:
+    from Inventory import Inventory
 
 
 class Item:

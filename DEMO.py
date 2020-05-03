@@ -2,7 +2,7 @@ import Inventory
 import Character
 import Races
 
-MainCharac = Character.Character("name", 20, 15, Races.races.elf, None)
+MainCharac = Character.Character("name", 20, 15, Races.Races.elf, None)
 
 MCInventory = Inventory.Inventory(MainCharac, 6)
 
