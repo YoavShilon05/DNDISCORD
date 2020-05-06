@@ -1,33 +1,49 @@
+from Action import Action, ExecuteAction
+from Player import Party
+from typing import List
+from inspect import getfullargspec
 
 
 class Room:
 
-    def __init__(self, name, longDescription, shortDescription, actions, adventure, **DunderActions):
+    def __init__(self, name, description, shortDescription, actions : List[Action], **DunderActions):
 
         self.name = name
-        self.longDescription = longDescription
+        self.description = description
         self.shortDescription = shortDescription
-        self.actions = actions
-        self.adventure = adventure
+        self.actions : List[Action] = actions
+
+        self.adventure = None
         self.players = []
         self._entered = False
 
-        self.initAction = DunderActions.get('initAction', None)
-        self.enteringAction = None
-        self.groupAction = None
+        self.onInit : Action or None = DunderActions.get('onInit', None)
+        self.onEnter : Action or None = DunderActions.get('onEnter', None)
+        self.onLeave : Action or None = DunderActions.get('onLeave', None)
 
+        self.onInit()
+    async def Enter(self, ctx, players):
 
-    def Enter(self, player):
-
-        self.players.append(player)
-        # syntax might be wrong, players class not written yet
-        player.room = self
+        self.players.extend(players)
+        for player in players:
+            player.room = self
 
         if not self._entered:
             self._entered = True
-            self.initAction.Execute(player)
+            await ctx.send(self.description)
+        else:
+            await ctx.send(self.shortDescription)
 
-    def Leave(self, player):
+        await ExecuteAction(self.onEnter, ctx, players)
 
-        self.players.remove(player)
-        player.room = None
+
+
+    async def Leave(self, players, ctx):
+
+        for p in players:
+            self.players.remove(p)
+            p.room = None
+
+        await ExecuteAction(self.onLeave, ctx, players)
+
+
