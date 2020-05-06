@@ -15,7 +15,7 @@ from Menu import Menu
 bot = commands.Bot(command_prefix="d.")
 GlobalVars.bot = bot
 
-TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.Xq6zTA.m06EqtNGS69T1YRHzdIVqnF6LH8' \
+TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
 onlinePlayers : Dict[discord.Member, Player] = {}
 
@@ -126,15 +126,22 @@ async def get_players(ctx : commands.Context):
     else:
         await ctx.send("no players were found.")
 
-childMenu = Menu("This is a child menu.", '<:python3:232720527448342530>',[])
-mainMenu = Menu("This is a menu.", "🍆", [childMenu])
+mainMenu = Menu("This is a menu.", "🍆", [])
 
 
+#🌍
+#🦾
+#🖐️
+#➡️
+#🛠️
 @bot.command()
 async def test_menu(ctx : commands.Context):
     await mainMenu.Send(ctx.channel, players[ctx.author])
 
-
+reactions = []
+@bot.event
+async def on_reaction_add(reaction, user):
+    reactions.append(reaction)
 
 
 bot.run(TOKEN)

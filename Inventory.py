@@ -19,7 +19,7 @@ class Inventory():
 
     def Preview(self):
         spaces = 8
-        return '\n'.join(i.name + " - " * spaces + i.description for i in self.items)
+        return '\n'.join([i.name + " - " * spaces + i.description for i in self.items])
 
     async def UseItem(self, ctx, user, item : Usable):
 

@@ -9,9 +9,11 @@ class Sexes(enum.Enum):
 
 
 class Entity:
-    def __init__(self, name, sex : Sexes, backstory=""):
+    def __init__(self, name, sex : Sexes, race, backstory=""):
         self.name = name
         self.sex = sex
+
+        self.race = race
 
         #TODO: make health & dmage be affected by races & profession.
         self.maxHealth = 25
@@ -34,10 +36,13 @@ class Entity:
 
     health = property(_HealthGetter, _HealthSetter)
 
+    async def Attack(self):
+        pass
+
 class Character(Entity):
 
     def __init__(self, name, sex, race, profession, backstory=""):
-        super().__init__(name, sex, backstory)
+        super().__init__(name, sex, race, backstory)
 
         self.race = race
         self.profession = profession
