@@ -15,5 +15,5 @@ class Action:
         if self.condition():
             self.action(executioner, context)
         else:
-            raise Exception("Condition was")
+            raise Exception("Condition was false.")
 
