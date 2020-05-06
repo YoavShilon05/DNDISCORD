@@ -1,5 +1,6 @@
 from Inventory import Inventory
 import enum
+from Room import Room
 
 class Sexes(enum.Enum):
     male = 0
@@ -46,3 +47,5 @@ class Character(Entity):
 
         self.race = race
         self.profession = profession
+
+        self.currentRoom : Room = None

@@ -1,31 +1,7 @@
-import Inventory
-import Character
-import Races
+from discord.ext import commands
 
-MainCharac = Character.Character("name", 20, 15, Races.Races.elf, None)
+bot = commands.Bot(command_prefix="d.")
+TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
+        ''
 
-MCInventory = Inventory.Inventory(MainCharac, 6)
-
-def foo(player):
-    player.health += 8
-
-Steak = Potion.Poiton("Steak", "steak...", foo)
-MCInventory.AddItem(Steak)
-
-
-while True:
-
-
-    i = input("> ")
-
-    if i == "inv":
-        print(str(MCInventory))
-
-    elif i == "use":
-        MCInventory.UseItem(MCInventory.items[0])
-
-    elif i == "health" or i == "hp":
-        print(MainCharac.health)
-
-    elif i == "steak":
-        MCInventory.AddItem(Steak)
+bot.run(TOKEN)

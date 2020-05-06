@@ -1,4 +1,5 @@
 from typing import List
+from discord import Member
 
 class Player:
 
@@ -28,4 +29,19 @@ class Party:
         if player in self.players:
             self.partyLeader = player
         else:
-            raise Exception("party leader not in party.")
+            raise Exception("party leader not in party")
+
+    def __getitem__(self, item):
+
+        if type(item) == Member:
+
+            for p in self.players:
+                if p.author == item:
+                    return p
+            raise KeyError(f"player {item} not in party")
+
+        elif type(item) == int:
+            return self.players[item]
+
+        else:
+            raise TypeError(f"party object can't index {type(item)} object")
