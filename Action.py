@@ -1,33 +1,34 @@
 from typing import *
 from Player import Player
-from discord.ext.commands import Context
-from Room import Room
 from inspect import getfullargspec
-
 
 
 
 
 class Action:
 
-    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool], **properties):
+    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool] = lambda : True, room=None,**properties):
         self.name = name
-        self.description = description
+        self.description = description if description != None and description != "" else name
         self.action = action
         self.condition = condition
+        self.room = room
 
-    async def Execute(self, *args):
+    async def __call__(self, *args):
+
+
 
         if self.condition():
-            self.action(args)
+            if len(getfullargspec(self.action).args) == 0:
+                await self.action()
+            elif len(getfullargspec(self.action).args) == 1:
+                context = args[0]
+                await self.action(context)
+            elif len(getfullargspec(self.action).args) == 2:
+                context = args[0]
+                executioners = args[1]
+                await self.action(context, executioners)
         else:
             raise Exception("Condition was false.")
 
 
-async def ExecuteAction(action: Action, context, executioners):
-    if len(getfullargspec(action).args) == 0:
-        await action.Execute()
-    elif len(getfullargspec(action).args) == 1:
-        await action.Execute(context)
-    elif len(getfullargspec(action).args) == 2:
-        await action.Execute(context, executioners)

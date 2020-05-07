@@ -1,5 +1,5 @@
+'''
 from typing import List
-import Races
 
 class Buffer:
 
@@ -12,8 +12,9 @@ class Buffer:
 
 class RaceBuffer(Buffer):
 
-    def __init__(self, name, damage, races : List[Races.Races], description=""):
+    def __init__(self, name, damage, races : List[Races], description=""):
 
         super().__init__(name, damage, description)
 
         self.races = races
+'''

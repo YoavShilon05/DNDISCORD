@@ -1,7 +1,7 @@
+'''
 import Item
 import random
 from typing import List
-import Buffers
 
 
 #Buffers - will be a dict: key is Name, value is a tuple - (damage, description)
@@ -47,3 +47,4 @@ class Weapon(Item.Item):
         else:
             self.raceBuffers.remove(buffer)
 
+'''

@@ -1,32 +1,41 @@
+from __future__ import annotations
 from typing import *
-from Room import Room
-from Action import ExecuteAction
-from Player import Party
+from Room import Room, CapStrToSpaced
+from Action import Action
+from Player import Party, Player
+
 
 class Command:
-    def __init__(self, name, action):
+    def __init__(self, name, action, aliases=[]):
         self.name = name
         self.action = action
-    def Execute(self, ctx, executioners):
-        ExecuteAction(self.action, ctx, executioners)
+        self.aliases = aliases
+
+    async def __call__(self, *args):
+        await self.action(*args)
 
 class Adventure:
 
-    def __init__(self, name, description, rooms : List[Room], startRoom : Room):
+    def __init__(self, name, description, rooms : List[Room], startRoom : Room or None = None):
 
         self.name = name
         self.description = description
         self.rooms = rooms
-        self.startRoom = startRoom
+        self.startRoom = startRoom if startRoom is not None else rooms[0]
+
         self.commands : List[Command] = []
+
+        @self.command()
+        async def inv(ctx, player):
+            """show yeer inv"""
+            await ctx.send(player.character.inventory)
+
 
         self.party : Party or None = None
 
-    def SetParty(self, party : Party):
+    async def Init(self, ctx, party : Party):
         self.party = party
-
-    async def Init(self, ctx, players):
-        await self.startRoom.Enter(ctx, players)
+        await self.startRoom.Enter(ctx, party.players)
 
     def AddCommand(self, command):
         self.commands.append(command)
@@ -37,18 +46,43 @@ class Adventure:
                 self.commands.remove(c)
                 return
 
-    async def ExecuteCommand(self, ctx, cmd):
+    async def ExecuteCommand(self, ctx, cmd : str, executioners : List[Player]):
+        for e in executioners:
+            if e not in self.party:
+                raise Exception(f"executioners of {cmd} command not in adventure party")
         player = self.party[ctx.author]
-        room = player.character.currentRoom
+        room = player.character.room
+
+        if cmd.isnumeric():
+            if int(cmd) - 1 <= len(room.actions):
+                await room.actions[int(cmd) - 1](ctx, executioners)
+
         for a in room.actions:
             if a.name == cmd:
-                await ExecuteAction(a, ctx, [player])
+                await a(ctx, executioners)
                 return
 
         for c in self.commands:
-            if c.name == cmd:
-                action = c.action
-                await ExecuteAction(action, ctx, [player])
+            commandNames = c.aliases.copy()
+            commandNames.append(c.name)
+            if cmd in commandNames:
+                await c(ctx, executioners)
                 return
 
-        raise Exception(f"no {cmd} command found.")
+        raise ValueError(f"{cmd} is not a valid command")
+
+    def command(self, *, aliases: List[str] = []):
+
+        def decorator(function):
+            commandObj = Command(
+                CapStrToSpaced(function.__name__),
+                Action(function.__name__, function.__doc__, function),
+                aliases
+            )
+            self.AddCommand(commandObj)
+            return commandObj
+
+        return decorator
+
+
+

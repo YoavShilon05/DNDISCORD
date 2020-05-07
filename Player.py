@@ -1,12 +1,16 @@
-from typing import List
+from __future__ import annotations
+from typing import *
 from discord import Member
+
+if TYPE_CHECKING:
+    from Room import Room
 
 class Player:
 
-    def __init__(self, author, nickname):
+    def __init__(self, author):
 
         self.author = author
-        self.nickname = nickname
+        self.nickname = author.name
         self.characters = []
         self.character = None
 
@@ -15,10 +19,15 @@ class Player:
     def AddCharacter(self, character):
         self.characters.append(character)
 
+    def Enter(self, ctx,  room : Room):
+        room.Enter(ctx, [self])
+
+    def SetNickname(self, newNickname):
+        self.nickname = newNickname
 
 class Party:
-    def __init__(self):
-        self.players : List[Player] = []
+    def __init__(self, players):
+        self.players : List[Player] = players
         self.partyLeader : Player or None = None
 
     def AddPlayer(self, player : Player):
