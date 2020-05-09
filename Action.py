@@ -7,14 +7,15 @@ from inspect import getfullargspec
 
 class Action:
 
-    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool] = lambda : True, room=None,**properties):
+    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool] = lambda : True, room=None, failFeedback="the action cant be executed, something is missing."):
         self.name = name
-        self.description = description if description != None and description != "" else name
+        self.description = description
         self.action = action
         self.condition = condition
         self.room = room
+        self.failFeedback = failFeedback
 
-    async def __call__(self, *args):
+    async def __call__(self, ctx, executioner : Player):
 
 
 
@@ -22,13 +23,10 @@ class Action:
             if len(getfullargspec(self.action).args) == 0:
                 await self.action()
             elif len(getfullargspec(self.action).args) == 1:
-                context = args[0]
-                await self.action(context)
+                await self.action(ctx)
             elif len(getfullargspec(self.action).args) == 2:
-                context = args[0]
-                executioners = args[1]
-                await self.action(context, executioners)
+                await self.action(ctx, executioner)
         else:
-            raise Exception("Condition was false.")
+            await ctx.send(self.failFeedback)
 
 

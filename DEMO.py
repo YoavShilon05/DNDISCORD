@@ -1,27 +1,40 @@
 from discord.ext import commands
+import GlobalVars
+bot = commands.Bot(command_prefix="d.")
+GlobalVars.bot = bot
 import Adventure
 import Room
-import Action
 import Player
 import Character
+import Sequence
+import Action
 
-bot = commands.Bot(command_prefix="d.")
 TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
 
 
-# ROOMS ________________________________________________________________________________________________________________
-room1 = Room.Room('room1','yeer in room 1, take a seat', 'room1')
-room2 = Room.Room('room1','yeer in room 2, take a seat', 'room2')
+def ConnectRooms(room1 : Room.Room, room2 : Room.Room):
+    def AddAction(room1, room2):
+        async def Function(ctx, player):
+            await room2.Enter(ctx, [player])
+        action = Action.Action(f"go to {room2.name}", "", Function, room=room2)
+        room1.AddAction(action)
+    AddAction(room1, room2)
+    AddAction(room2, room1)
 
+
+# ROOMS ________________________________________________________________________________________________________________
+room1 = Room.Room('room1', Sequence.Sequence(['you are in room 1', ("theres a brown table and two chairs", 'Smash Mouth - All Star.mp3')]), Sequence.Sequence([('room 1', 0)]))
+room2 = Room.Room('room2', Sequence.Sequence([('you are in room 2', 'Smash Mouth - All Star.mp3', 1.5), ("theres a blue table and five chairs", 'Smash Mouth - All Star.mp3', 1.5)], ), Sequence.Sequence(['room 2']))
+room3 = Room.Room('room3', Sequence.Sequence([('you are in room 3', 1.5), ('idk what to put here.', 1.5)]), Sequence.Sequence([('room 3', 0)]))
 # ACTIONS ______________________________________________________________________________________________________________
 
 
-adv = Adventure.Adventure("DEMO ADVENTURE", 'idk just a demo', [room1, room2])
+adv = Adventure.Adventure("DEMO ADVENTURE", 'idk just a demo', [room1, room2, room3])
 
-@room1.action()
-async def MoveToRoom2(ctx, players : Player.Player):
-    await room2.Enter(ctx, players)
+ConnectRooms(room1, room2)
+ConnectRooms(room1, room3)
+ConnectRooms(room2, room3)
 
 @adv.command()
 async def tst(ctx):
@@ -42,9 +55,10 @@ async def set(ctx):
     party = Player.Party([player])
     await adv.Init(ctx, party)
 
+
 @bot.command()
 async def cmd(ctx, *, msg):
     player = party[ctx.author]
-    await adv.ExecuteCommand(ctx, msg, [player])
+    await adv.ExecuteCommand(ctx, msg, player)
 
 bot.run(TOKEN)

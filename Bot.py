@@ -1,23 +1,25 @@
+#EXTERNAL LIBRARIES ______________________________________
+import GlobalVars
 import discord
 from discord.ext import commands
 import pickle
 import asyncio
 from typing import *
-import GlobalVars
 from copy import copy
 
-from Player import Player
-from Character import Character
-from Races import Races
-from Professions import Professions
-from Menu import Menu
-
+# GLOBAL VARS ___________________________________________
 bot = commands.Bot(command_prefix="d.")
 GlobalVars.bot = bot
 
+# FILES _________________________________________________
+from Player import Player
+from Character import Character, Races, Professions
+
+from Menu import Menu
+
+
 TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
-onlinePlayers : Dict[discord.Member, Player] = {}
 
 # FUNCTIONS ____________________________________________________________________________________________________________
 
@@ -83,14 +85,12 @@ def GetPlayers():
 
 
 # COMMANDS______________________________________________________________________________________________________________
-players: Dict[discord.Member, Player]
+players: Dict[discord.Member, Player] = {}
 @bot.event
 async def on_ready():
     print("ready")
 
     # PLAYERS_______________________________________________________________________________________________________________
-
-    global players
     players = GetPlayers()
 
 @bot.command()
@@ -99,9 +99,8 @@ async def connect(ctx : commands.Context):
     if ctx.author in players:
         await ctx.send(f"Welcome back {players[ctx.author].nickname}!")
     else:
-        await ctx.send("I see you are new here, what nickname would you like to have?")
-        nickname = await bot.wait_for('message', check=lambda m : m.author == ctx.author)
-        newPlayer = Player(ctx.author, nickname.content)
+        await ctx.send(f"Welcome to the crew {ctx.author.name}")
+        newPlayer = Player(ctx.author)
         players[ctx.author] = newPlayer
         UpdatePlayers()
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import *
-from discord import Member
+import discord
 
 if TYPE_CHECKING:
     from Room import Room
@@ -9,10 +9,11 @@ class Player:
 
     def __init__(self, author):
 
-        self.author = author
+        self.author : discord.Member = author
         self.nickname = author.name
         self.characters = []
         self.character = None
+        self.adventure = None
 
         self.party : Party or None = None
 
@@ -24,6 +25,9 @@ class Player:
 
     def SetNickname(self, newNickname):
         self.nickname = newNickname
+
+    def SetAdventure(self, adventure):
+        self.adventure = adventure
 
 class Party:
     def __init__(self, players):
@@ -42,7 +46,7 @@ class Party:
 
     def __getitem__(self, item):
 
-        if type(item) == Member:
+        if type(item) == discord.Member or type(item) == discord.User:
 
             for p in self.players:
                 if p.author == item:
