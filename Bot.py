@@ -3,20 +3,20 @@ import GlobalVars
 import discord
 from discord.ext import commands
 import pickle
-import asyncio
 from typing import *
 from copy import copy
+import asyncio
 
 # GLOBAL VARS ___________________________________________
 bot = commands.Bot(command_prefix="d.")
 GlobalVars.bot = bot
 
 # FILES _________________________________________________
-from Player import Player
+from Player import Player, Party
 from Character import Character, Races, Professions
 
-from Menu import Menu
-
+from Menu import Menu, Starter
+from Adventure import Adventure
 
 TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
@@ -60,58 +60,47 @@ async def MakeCharacter(ctx : commands.Context):
     return newCharacter
 
 def UpdatePlayers():
-    with open("Players.dat", 'wb') as f:
+    with open("./Players.dat", 'wb') as f:
 
         pickledPlayers = {}
 
-        for author, player in players.items():
+        for authorId, player in players.items():
             pickledPlayer = copy(player)
             pickledPlayer.author = None
-            pickledPlayers[author.id] = pickledPlayer
+            pickledPlayer.Reset()
+            pickledPlayers[authorId] = pickledPlayer
 
         pickle.dump(pickledPlayers, f)
 
-def GetPlayers():
+def LoadPlayers():
 
-    with open('Players.dat', 'rb') as f:
+    with open('./Players.dat', 'rb') as f:
         pickledPlayers = pickle.load(f)
 
         newPlayers = {}
         for id, player in pickledPlayers.items():
             player.author = bot.get_user(id)
-            newPlayers[bot.get_user(id)] = player
+            player.party = Party([player])
+            newPlayers[id] = player
         return newPlayers
 
+def LoadAdventures():
 
+    with open('Adventures.dat', 'rb') as f:
+        adventures = pickle.load(f)
 
 # COMMANDS______________________________________________________________________________________________________________
-players: Dict[discord.Member, Player] = {}
+players: Dict[int, Player] = {}
+adventures : List[Adventure]
 @bot.event
 async def on_ready():
     print("ready")
 
-    # PLAYERS_______________________________________________________________________________________________________________
-    players = GetPlayers()
+    # PLAYERS_____________________________________________________________________________________________________________
+    global players
+    players = LoadPlayers()
+    GlobalVars.players = players
 
-@bot.command()
-async def connect(ctx : commands.Context):
-
-    if ctx.author in players:
-        await ctx.send(f"Welcome back {players[ctx.author].nickname}!")
-    else:
-        await ctx.send(f"Welcome to the crew {ctx.author.name}")
-        newPlayer = Player(ctx.author)
-        players[ctx.author] = newPlayer
-        UpdatePlayers()
-
-
-        #TODO: un-comment dat:
-
-        #await ctx.send(f"Hello {nickname.content}! Lets make your first character.")
-        #await asyncio.sleep(2)
-        #character = await MakeCharacter(ctx)
-
-        #newPlayer.AddCharacter(character)
 
 
 @bot.command()
@@ -125,7 +114,36 @@ async def get_players(ctx : commands.Context):
     else:
         await ctx.send("no players were found.")
 
-mainMenu = Menu("This is a menu.", "🍆", [])
+async def StartAdventure(channel, party, adventure : Adventure):
+    await adventure.Init(channel, party)
+
+    Playing = True
+    while Playing:
+
+        msg : discord.Message = await bot.wait_for('message', check= lambda m : players[m.author] == adventure.turn)
+        result = await adventure.ExecuteCommand(msg, players[msg.author])
+
+async def CommunityAdventures(channel : discord.TextChannel, player : Player):
+
+    adventuresPlayed = []
+    party = player.party
+
+    for p in party:
+        adventuresPlayed.extend(p.adventuresPlayed)
+
+    for a in adventures:
+        if a not in adventuresPlayed:
+            await StartAdventure(channel, party, a)
+
+communityAdventures = Starter("Community Adventures", "🖐️", CommunityAdventures)
+computerAdventures = Starter("Computer Generated Adventure", "🦾", CommunityAdventures)
+async def Pass():
+    pass
+adventureBuilder = Starter("Adventure Builder", "🛠️", Pass)
+
+quickPlay = Menu("Quick Play", "➡️", [communityAdventures, computerAdventures])
+campaign = Menu("Campaign", "🌍", [])
+mainMenu = Menu("Main Menu", "🍆", [campaign, quickPlay, adventureBuilder])
 
 
 #🌍
@@ -133,14 +151,68 @@ mainMenu = Menu("This is a menu.", "🍆", [])
 #🖐️
 #➡️
 #🛠️
+
+declineInvite = '⛔'
+acceptInvite = '✅'
+
 @bot.command()
-async def test_menu(ctx : commands.Context):
-    await mainMenu.Send(ctx.channel, players[ctx.author])
+async def start(ctx : commands.Context):
+    if ctx.author.id in players.keys():
+        await ctx.send(f"Welcome back {players[ctx.author.id].nickname}!")
+    else:
+        await ctx.send(f"Welcome to the crew {ctx.author.name}")
+        newPlayer = Player(ctx.author)
+        players[ctx.author.id] = newPlayer
+        GlobalVars.players[ctx.author.id] = newPlayer
+        UpdatePlayers()
 
-reactions = []
-@bot.event
-async def on_reaction_add(reaction, user):
-    reactions.append(reaction)
+        await asyncio.sleep(2)
 
+        await ctx.send(f"Lets make your first character.")
+
+        await asyncio.sleep(1.25)
+
+        character = await MakeCharacter(ctx)
+        newPlayer.AddCharacter(character)
+
+    await mainMenu.Send(ctx.channel, players[ctx.author.id])
+
+
+
+# PARTY COMMANDS _______________________________________________________________________________________________________
+
+@bot.command(aliases=['invite'])
+async def inv(ctx : commands.Context, member : discord.Member):
+
+    invitationTimeout = 300
+
+    sender = players[ctx.author.id]
+
+    invitation = await member.send(f"{ctx.author.mention} has invited you to a party", delete_after=invitationTimeout)
+    await invitation.add_reaction(acceptInvite)
+    await invitation.add_reaction(declineInvite)
+
+    await ctx.send(f"Invited {member.mention} to the party.")
+
+    reaction, user = await bot.wait_for('reaction_add', check=lambda r, u : r.emoji == acceptInvite or r.emoji == declineInvite, timeout=invitationTimeout)
+
+    try:
+        await invitation.delete()
+    except commands.CommandInvokeError:
+        await ctx.send(f"the invitation for {user.mention} has expired")
+
+    receiver = players[user.id]
+
+    if reaction.emoji == acceptInvite:
+        sender.party.AddPlayer(receiver)
+        await ctx.send(f"{user.mention} has joined your party!")
+    else:
+        await ctx.send(f"{user.mention} has declined your party invitation")
+
+
+@bot.command(aliases=['p'])
+async def party(ctx):
+    player = players[ctx.author.id]
+    ctx.send(", ".join([p.author.mention for p in player.party]))
 
 bot.run(TOKEN)

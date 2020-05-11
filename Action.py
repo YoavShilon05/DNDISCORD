@@ -1,32 +1,29 @@
 from typing import *
 from Player import Player
 from inspect import getfullargspec
-
-
+import discord
+from Functions import CallAction
 
 
 class Action:
 
-    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool] = lambda : True, room=None, failFeedback="the action cant be executed, something is missing."):
+    def __init__(self, name : str, description : str, action : Callable, condition : Callable[[], bool] = lambda : True, passTurn=True, failFeedback="the action cant be executed, something is missing."):
         self.name = name
         self.description = description
         self.action = action
         self.condition = condition
-        self.room = room
+        self.passTurn = passTurn
+        self.room = None
         self.failFeedback = failFeedback
 
-    async def __call__(self, ctx, executioner : Player):
 
-
+    async def __call__(self, message : discord.Message, executioner : Player):
 
         if self.condition():
-            if len(getfullargspec(self.action).args) == 0:
-                await self.action()
-            elif len(getfullargspec(self.action).args) == 1:
-                await self.action(ctx)
-            elif len(getfullargspec(self.action).args) == 2:
-                await self.action(ctx, executioner)
+            await CallAction(self.action, message, executioner)
+            return not self.passTurn
         else:
-            await ctx.send(self.failFeedback)
+            await message.channel.send(self.failFeedback)
+            return False
 
 

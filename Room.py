@@ -1,10 +1,11 @@
 from Action import Action
 from typing import *
 import Sequence
+from Functions import SpaceFunctionName
 
 class Room:
 
-    def __init__(self, name, description : Sequence.Sequence, shortDescription : Sequence.Sequence, **DunderActions):
+    def __init__(self, name, description : Sequence.Sequence, shortDescription : Sequence.Sequence):
 
         self.name = name
         self.description : Sequence.Sequence = description
@@ -20,85 +21,67 @@ class Room:
 
         async def empty():
             print("empty function called")
-        EmptyAction = Action('', '', empty, room=self)
+        EmptyAction = Action('', '', empty)
 
-        self.onEnter : Action = DunderActions.get('onEnter', EmptyAction)
-        self.onLeave : Action = DunderActions.get('onLeave', EmptyAction)
+        self.onEnter : Action = EmptyAction
+        self.onLeave : Action = EmptyAction
 
     def AddAction(self, action : Action, index = None):
         if index == None:
             self.actions.append(action)
         else:
             self.actions.insert(index, action)
+        return action
 
-    async def Enter(self, ctx, players):
+    async def Enter(self, channel, player):
 
-        self.players.extend(players)
-        for player in players:
-            player.character.room = self
+        self.players.append(player)
+        await player.character.room.Leave(channel, player)
+        player.character.room = self
 
         if not self.entered:
             self.entered = True
-            await self.description.Play(ctx.channel)
+            await self.description.Play(channel)
         else:
-            await self.shortDescription.Play(ctx.channel)
+            await self.shortDescription.Play(channel)
 
         actionsStr = "possible actions:\n"
         for i in range(len(self.actions)):
             a = self.actions[i]
             spacesToDescription = 8
             actionsStr += f"{i + 1}. {a.name}{(spacesToDescription * ' - ' + a.description) if a.description != None and a.description != '' else ''}" + "\n"
-        await ctx.send(actionsStr)
+        await channel.send(actionsStr)
 
 
-        await self.onEnter(ctx, players)
+        await self.onEnter(channel, player)
 
-    async def Leave(self, players, ctx):
-
-        for p in players:
-            self.players.remove(p)
-            p.room = None
+    async def Leave(self, channel, player):
+        self.players.remove(player)
+        player.room = None
 
         self.left = True
 
-        await self.onLeave(ctx, players)
+        await self.onLeave(channel, player)
 
-    def action(self, *, condition: Callable[[], bool] = lambda: True, index=-1, failFeedback="the action cant be executed, something is missing."):
+    def action(self, *, condition: Callable[[], bool] = lambda: True, index=-1, passTurn, failFeedback="the action cant be executed, something is missing."):
 
         def decorator(function):
             actionObj = Action(
-                CapStrToSpaced(function.__name__),
+                SpaceFunctionName(function.__name__),
                 function.__doc__,
                 function,
                 condition,
-                self,
                 failFeedback
             )
 
-            self.AddAction(actionObj, index)
+            if actionObj.name == "on enter":
+                self.onEnter = actionObj
+            elif actionObj.name == "on leave":
+                self.onLeave = actionObj
+            else:
+                self.AddAction(actionObj, index)
             return actionObj
 
         return decorator
-
-
-def CapStrToSpaced(string : str):
-
-    #newStr starts with a colon to allow to index it.
-    #wil be replaced in return.
-    newStr = ":"
-
-    for i in range(len(string)):
-        l = string[i]
-        if newStr[-1] == " ":
-            newStr += l.lower()
-        else:
-            if l.isupper() or l.isnumeric():
-                newStr += " " + l.lower() if i != 0 else l.lower()
-            elif l == '_' or l == '-':
-                newStr += " "
-            else:
-                newStr += l
-
-    return newStr[1:]
 
 

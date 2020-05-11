@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import *
 import discord
+import random
 
 if TYPE_CHECKING:
     from Room import Room
@@ -14,6 +15,7 @@ class Player:
         self.characters = []
         self.character = None
         self.adventure = None
+        self.adventuresPlayed = set()
 
         self.party : Party or None = None
 
@@ -29,10 +31,15 @@ class Player:
     def SetAdventure(self, adventure):
         self.adventure = adventure
 
+    def Reset(self):
+        self.party = None
+        self.adventure = None
+
 class Party:
     def __init__(self, players):
         self.players : List[Player] = players
         self.partyLeader : Player or None = None
+        self.partyLeader = random.choice(self.players)
 
     def AddPlayer(self, player : Player):
         self.players.append(player)
@@ -44,7 +51,7 @@ class Party:
         else:
             raise Exception("party leader not in party")
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Player:
 
         if type(item) == discord.Member or type(item) == discord.User:
 
@@ -58,3 +65,6 @@ class Party:
 
         else:
             raise TypeError(f"party object can't index {type(item)} object")
+
+    def __len__(self):
+        return len(self.players)
