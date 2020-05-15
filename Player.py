@@ -17,7 +17,7 @@ class Player:
         self.adventure = None
         self.adventuresPlayed = set()
 
-        self.party : Party or None = None
+        self.party : Party = Party([self])
 
     def AddCharacter(self, character):
         self.characters.append(character)
@@ -35,6 +35,13 @@ class Player:
         self.party = None
         self.adventure = None
 
+    def SetCharacter(self, character):
+        if character in self.characters:
+            self.character = character
+        else:
+            raise Exception(f"character {character.name} is not in {self.author.name}'s character bank.")
+
+
 class Party:
     def __init__(self, players):
         self.players : List[Player] = players
@@ -50,6 +57,12 @@ class Party:
             self.partyLeader = player
         else:
             raise Exception("party leader not in party")
+
+    def Kick(self, player : Player):
+        self.players.remove(player)
+        player.party = Party([player])
+        if self.partyLeader == player:
+            self.partyLeader = self.players[0]
 
     def __getitem__(self, item) -> Player:
 

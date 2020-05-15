@@ -1,8 +1,7 @@
 from typing import *
-from Player import Player
-from inspect import getfullargspec
+import Player
 import discord
-from Functions import CallAction
+import Functions
 
 
 class Action:
@@ -17,13 +16,13 @@ class Action:
         self.failFeedback = failFeedback
 
 
-    async def __call__(self, message : discord.Message, executioner : Player):
+    async def __call__(self, channel : discord.TextChannel, executioner : Player.Player):
 
         if self.condition():
-            await CallAction(self.action, message, executioner)
+            await Functions.CallAction(self.action, channel, executioner)
             return not self.passTurn
         else:
-            await message.channel.send(self.failFeedback)
+            await channel.send(self.failFeedback)
             return False
 
 

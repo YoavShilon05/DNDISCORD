@@ -1,7 +1,8 @@
-from Action import Action
+import Action
 from typing import *
 import Sequence
-from Functions import SpaceFunctionName
+import Functions
+import functools
 
 class Room:
 
@@ -21,12 +22,12 @@ class Room:
 
         async def empty():
             print("empty function called")
-        EmptyAction = Action('', '', empty)
+        EmptyAction = Action.Action('', '', empty)
 
-        self.onEnter : Action = EmptyAction
-        self.onLeave : Action = EmptyAction
+        self.onEnter : Action.Action = EmptyAction
+        self.onLeave : Action.Action = EmptyAction
 
-    def AddAction(self, action : Action, index = None):
+    def AddAction(self, action : Action.Action, index = None):
         if index == None:
             self.actions.append(action)
         else:
@@ -36,8 +37,11 @@ class Room:
     async def Enter(self, channel, player):
 
         self.players.append(player)
-        await player.character.room.Leave(channel, player)
+        if player.character.room != None:
+            await player.character.room.Leave(channel, player)
+
         player.character.room = self
+        await self.onEnter(channel, player)
 
         if not self.entered:
             self.entered = True
@@ -53,35 +57,46 @@ class Room:
         await channel.send(actionsStr)
 
 
-        await self.onEnter(channel, player)
+    def SilentEnter(self, player):
+        if player.character.room != None:
+            player.room.SilentLeave(player)
+        self.players.append(player)
+        player.character.room = self
+
 
     async def Leave(self, channel, player):
         self.players.remove(player)
-        player.room = None
+        player.character.room = None
 
         self.left = True
 
         await self.onLeave(channel, player)
 
-    def action(self, *, condition: Callable[[], bool] = lambda: True, index=-1, passTurn, failFeedback="the action cant be executed, something is missing."):
+    def SilentLeave(self, player):
+        self.players.remove(player)
+        player.character.room = None
+
+    def action(self, *, condition: Callable[[], bool] = lambda: True, index=-1, passTurn=False,
+               rooms=[], failFeedback="the action cant be executed, something is missing."):
 
         def decorator(function):
-            actionObj = Action(
-                SpaceFunctionName(function.__name__),
+            actionObj = Action.Action(
+                Functions.SpaceFunctionName(function.__name__),
                 function.__doc__,
                 function,
                 condition,
+                passTurn,
                 failFeedback
             )
 
-            if actionObj.name == "on enter":
-                self.onEnter = actionObj
-            elif actionObj.name == "on leave":
-                self.onLeave = actionObj
-            else:
-                self.AddAction(actionObj, index)
-            return actionObj
+            rooms.append(self)
+            for r in rooms:
+                if actionObj.name == "on enter":
+                    r.onEnter = actionObj
+                elif actionObj.name == "on leave":
+                    r.onLeave = actionObj
+                else:
+                    r.AddAction(actionObj, index)
+                return actionObj
 
         return decorator
-
-

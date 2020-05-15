@@ -11,7 +11,6 @@ passEmoji = '▶️'
 class Sequence:
     def __init__(self, items : list or tuple, *, deleteMessages=True):
         self.waitForReaction = True
-        #TODO: make sure al items of sequenc eare of the same type.
         for item in items:
             if type(item) is list or type(item) is tuple:
                 if type(item[-1]) is float or type(item[-1]) == int:
@@ -22,24 +21,24 @@ class Sequence:
         self.room = None
 
     async def Play(self, channel : discord.TextChannel):
+
+        playedMusic = False
+
         for item in self.sequence:
             msg = None
 
-            #TODO: if there's sound play it
-
-            if (type(item) == list or type(item) == tuple):
+            if type(item) == list or type(item) == tuple:
                 if type(item[1]) is str:
                     adventure = self.room.adventure
-                    if adventure.useVoice:
-                        voiceClient : discord.VoiceClient = GlobalVars.botVoiceClients[channel.guild]
-                        if voiceClient.is_playing():
-                            voiceClient.stop()
-                        voiceClient.play(discord.FFmpegPCMAudio(item[1]))
+                    playedMusic = True
+                    adventure.ResumeBackgroundMusic(channel.guild)
+                    voiceClient : discord.VoiceClient = GlobalVars.botVoiceClients[channel.guild]
+                    voiceClient.play(discord.FFmpegPCMAudio(item[1]))
 
 
             if self.waitForReaction:
                 message = item
-                if type(message) == list or type(message) == tuple:
+                if type(message) == iter or type(message) == tuple:
                     message = item[0]
                 msg = await channel.send(message)
                 await msg.add_reaction(passEmoji)
@@ -54,7 +53,8 @@ class Sequence:
                 await msg.delete()
 
         adventure = self.room.adventure
-        if adventure.useVoice:
+        if playedMusic:
             voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[channel.guild]
             if voiceClient.is_playing():
                 voiceClient.stop()
+            adventure.ResumeBackgroundMusic()

@@ -1,6 +1,6 @@
-from Inventory import Inventory
+import Inventory
 import enum
-from Room import Room
+import Room
 
 class Sexes(enum.Enum):
     male = 0
@@ -99,9 +99,9 @@ class Entity:
         self.damage = 15
 
         self.backstory = backstory
-        self.inventory = Inventory(self, 2, 7)
+        self.inventory = Inventory.Inventory(self, 2, 7)
         self.mainWeapon = None
-        self.room: Room = None
+        self.room: Room.Room = None
 
     #Health doesnt go above max
     def _HealthGetter(self):

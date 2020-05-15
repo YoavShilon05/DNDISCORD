@@ -1,20 +1,23 @@
-from  __future__ import annotations
+from __future__ import annotations
 from typing import *
 from inspect import getfullargspec
+import Action
+import Room
 import discord
 if TYPE_CHECKING:
-    from Room import Room
-    from Action import Action
-    from Player import Player
+    import Player
 
-def ConnectRooms(room1 : Room, room2 : Room):
-    def AddAction(room1, room2):
-        async def Function(ctx, player):
-            await room2.Enter(ctx, [player])
-        action = Action(f"go to {room2.name.lower()}", "", Function)
-        room1.AddAction(action)
-    AddAction(room1, room2)
-    AddAction(room2, room1)
+
+
+
+def ConnectRooms(room1 : Room.Room, room2 : Room.Room):
+    def AddRoomEnterAction(firstRoom, secondRoom):
+        async def Function(channel, player):
+            await secondRoom.Enter(channel, player)
+        action = Action.Action(f"go to {secondRoom.name.lower()}", "", Function)
+        firstRoom.AddAction(action)
+    AddRoomEnterAction(room1, room2)
+    AddRoomEnterAction(room2, room1)
 
 def SpaceFunctionName(name : str):
 
@@ -37,10 +40,10 @@ def SpaceFunctionName(name : str):
     return newStr[1:]
 
 
-async def CallAction(action : Callable, message : discord.Message, executioner : Player):
+async def CallAction(action : Callable, channel : discord.TextChannel, executioner : Player.Player):
     if len(getfullargspec(action).args) == 0:
         await action()
     elif len(getfullargspec(action).args) == 1:
-        await action(message)
+        await action(channel)
     elif len(getfullargspec(action).args) == 2:
-        await action(message, executioner)
+        await action(channel, executioner)

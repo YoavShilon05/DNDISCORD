@@ -2,21 +2,22 @@
 import GlobalVars
 import discord
 from discord.ext import commands
-import pickle
+import dill
 from typing import *
-from copy import copy
+from copy import deepcopy
 import asyncio
+
 
 # GLOBAL VARS ___________________________________________
 bot = commands.Bot(command_prefix="d.")
 GlobalVars.bot = bot
 
 # FILES _________________________________________________
-from Player import Player, Party
-from Character import Character, Races, Professions
+import Player
+import Character
 
-from Menu import Menu, Starter
-from Adventure import Adventure
+import Menu
+import Adventure
 
 TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
@@ -40,19 +41,19 @@ async def MakeCharacter(ctx : commands.Context):
             await WaitForMsg("", failMsg, condition)
 
     racesStr = ""
-    for r in Races:
+    for r in Character.Races:
         # if race is good / hero race:
         if r.value[0] == 0:
             racesStr += r.name + "\n"
 
-    professionsStr = '\n'.join([p.name for p in Professions])
+    professionsStr = '\n'.join([p.name for p in Character.Professions])
 
-    newCharacter = Character(
+    newCharacter = Character.Character(
         await WaitForMsg("What is your character's name?"),
         # if the sexes ever change, change that although idk why would they change i mean what?
         await WaitForMsg("What is your character's sex?\npossible sexes are -\nmale\nfemale\nunknown", condition=lambda m : m.content.lower() in ['male', 'female', 'unknown']),
-        await WaitForMsg("What will your character's race be?\nPossible races are:\n" + racesStr, "Couldn't find that race.", lambda m: m.content.lower() in [r.name.lower() for r in Races]),
-        await WaitForMsg("What will your character's profession be?\nPossible professions are:\n" + professionsStr, "Couldn't find that profession.", lambda m: m.content.lower() in [p.name.lower() for p in Professions]),
+        await WaitForMsg("What will your character's race be?\nPossible races are:\n" + racesStr, "Couldn't find that race.", lambda m: m.content.lower() in [r.name.lower() for r in Character.Races]),
+        await WaitForMsg("What will your character's profession be?\nPossible professions are:\n" + professionsStr, "Couldn't find that profession.", lambda m: m.content.lower() in [p.name.lower() for p in Character.Professions]),
         await WaitForMsg("What is your character's backstory?")
 
     )
@@ -60,70 +61,99 @@ async def MakeCharacter(ctx : commands.Context):
     return newCharacter
 
 def UpdatePlayers():
-    with open("./Players.dat", 'wb') as f:
+    with open("Players.dat", 'wb') as f:
 
-        pickledPlayers = {}
+        dilldPlayers = {}
 
         for authorId, player in players.items():
-            pickledPlayer = copy(player)
-            pickledPlayer.author = None
-            pickledPlayer.Reset()
-            pickledPlayers[authorId] = pickledPlayer
+            dilldPlayer = deepcopy(player)
+            dilldPlayer.author = None
+            dilldPlayer.Reset()
+            dilldPlayers[authorId] = dilldPlayer
 
-        pickle.dump(pickledPlayers, f)
+        dill.dump(dilldPlayers, f)
 
 def LoadPlayers():
 
-    with open('./Players.dat', 'rb') as f:
-        pickledPlayers = pickle.load(f)
+    with open('Players.dat', 'rb') as f:
+        dilldPlayers = dill.load(f)
 
         newPlayers = {}
-        for id, player in pickledPlayers.items():
-            player.author = bot.get_user(id)
-            player.party = Party([player])
-            newPlayers[id] = player
+        for id, player in dilldPlayers.items():
+            dilldPlayer = player
+            dilldPlayer.author = bot.get_user(id)
+            dilldPlayer.party = Player.Party([dilldPlayer])
+            newPlayers[id] = dilldPlayer
         return newPlayers
 
 def LoadAdventures():
 
     with open('Adventures.dat', 'rb') as f:
-        adventures = pickle.load(f)
+        adventures = dill.load(f)
+        return adventures
+
 
 # COMMANDS______________________________________________________________________________________________________________
-players: Dict[int, Player] = {}
-adventures : List[Adventure]
+players: Dict[int, Player.Player] = {}
+adventures : List[Adventure.Adventure] = []
+
 @bot.event
 async def on_ready():
     print("ready")
 
     # PLAYERS_____________________________________________________________________________________________________________
     global players
+    global adventures
     players = LoadPlayers()
     GlobalVars.players = players
+    print("loaded players")
+    adventures = LoadAdventures()
+    print("loaded adventures")
 
 
 
 @bot.command()
 async def get_players(ctx : commands.Context):
+
     if len(players) > 0:
         playerNames = []
-        for author, player in players.items():
-            playerNames.append(author.name + " : " + player.nickname)
+        for authorId, player in players.items():
+            playerNames.append(bot.get_user(authorId) + " : " + player.nickname)
 
         await ctx.send(',\n'.join(playerNames))
     else:
         await ctx.send("no players were found.")
 
-async def StartAdventure(channel, party, adventure : Adventure):
-    await adventure.Init(channel, party)
+
+
+async def StartAdventure(channel, party, adventure : Adventure.Adventure):
 
     Playing = True
-    while Playing:
 
-        msg : discord.Message = await bot.wait_for('message', check= lambda m : players[m.author] == adventure.turn)
-        result = await adventure.ExecuteCommand(msg, players[msg.author])
+    async def PlayAdventure():
+        await adventure.Init(channel, party)
+        nonlocal Playing
+        while Playing:
+            msg : discord.Message = await bot.wait_for('message', check= lambda m : m.author.id in players and players[m.author.id] == adventure.currentPlayer)
+            result = await adventure.ExecuteAction(msg, players[msg.author.id])
+            if not result:
+                Playing = False
 
-async def CommunityAdventures(channel : discord.TextChannel, player : Player):
+    async def ExecuteCommands():
+        print("started executing commands")
+        adventureCommands = []
+        for c in adventure.commands:
+            adventureCommands.append(c.name)
+            adventureCommands.extend(c.aliases)
+
+        while Playing:
+            msg: discord.Message = await bot.wait_for('message', check=lambda m: m.author.id in players and players[m.author.id] == adventure.currentPlayer
+                                                      and m.content in adventureCommands)
+            await adventure.ExecuteCommand(msg, players[msg.author.id])
+
+    await asyncio.gather(PlayAdventure(), ExecuteCommands())
+
+async def CommunityAdventures(channel : discord.TextChannel, player : Player.Player):
 
     adventuresPlayed = []
     party = player.party
@@ -134,16 +164,17 @@ async def CommunityAdventures(channel : discord.TextChannel, player : Player):
     for a in adventures:
         if a not in adventuresPlayed:
             await StartAdventure(channel, party, a)
+            return
 
-communityAdventures = Starter("Community Adventures", "🖐️", CommunityAdventures)
-computerAdventures = Starter("Computer Generated Adventure", "🦾", CommunityAdventures)
+communityAdventures = Menu.Starter("Community Adventures", "🖐️", CommunityAdventures, 'play adventures made by the community')
+computerAdventures = Menu.Starter("Computer Generated Adventure", "🦾", CommunityAdventures, 'play random-generated adventures.')
 async def Pass():
     pass
-adventureBuilder = Starter("Adventure Builder", "🛠️", Pass)
+adventureBuilder = Menu.Starter("Adventure Builder", "🛠️", Pass, 'Build your own adventures using the Adventure Builder tool!')
 
-quickPlay = Menu("Quick Play", "➡️", [communityAdventures, computerAdventures])
-campaign = Menu("Campaign", "🌍", [])
-mainMenu = Menu("Main Menu", "🍆", [campaign, quickPlay, adventureBuilder])
+quickPlay = Menu.Menu("Quick Play", "➡️", [communityAdventures, computerAdventures], 'Quick random games by the community / computer generated')
+campaign = Menu.Menu("Campaign", "🌍", [], 'explore the open world, play missions, and experience the `D&DISCORD` campaign.')
+mainMenu = Menu.Menu("Main Menu", "🍆", [campaign, quickPlay, adventureBuilder])
 
 
 #🌍
@@ -159,24 +190,31 @@ acceptInvite = '✅'
 async def start(ctx : commands.Context):
     if ctx.author.id in players.keys():
         await ctx.send(f"Welcome back {players[ctx.author.id].nickname}!")
+        player = players[ctx.author.id]
+        player.author = ctx.author
     else:
         await ctx.send(f"Welcome to the crew {ctx.author.name}")
-        newPlayer = Player(ctx.author)
-        players[ctx.author.id] = newPlayer
-        GlobalVars.players[ctx.author.id] = newPlayer
-        UpdatePlayers()
-
         await asyncio.sleep(2)
-
         await ctx.send(f"Lets make your first character.")
-
         await asyncio.sleep(1.25)
 
         character = await MakeCharacter(ctx)
+        newPlayer = Player.Player(ctx.author)
+        players[ctx.author.id] = newPlayer
+        GlobalVars.players[ctx.author.id] = newPlayer
         newPlayer.AddCharacter(character)
+        newPlayer.SetCharacter(newPlayer.characters[0])
+        UpdatePlayers()
 
     await mainMenu.Send(ctx.channel, players[ctx.author.id])
 
+
+@bot.command()
+async def debug(ctx):
+    player = players[ctx.author.id]
+    player.author = ctx.author
+
+    await CommunityAdventures(ctx.channel, player)
 
 
 # PARTY COMMANDS _______________________________________________________________________________________________________
@@ -213,6 +251,27 @@ async def inv(ctx : commands.Context, member : discord.Member):
 @bot.command(aliases=['p'])
 async def party(ctx):
     player = players[ctx.author.id]
-    ctx.send(", ".join([p.author.mention for p in player.party]))
+    await ctx.send(", ".join([p.author.mention for p in player.party]))
+
+
+@bot.command(aliases=['k'])
+async def kick(ctx, member : discord.Member):
+    player = players[ctx.author.id]
+    if len(player.party) > 1 and player.party.partyLeader == player:
+        player.party.Kick(players[member.id])
+
+        await ctx.send(f"kicked {member.mention} from the party")
+        await ctx.author.send(f"you have been kicked from {player.author.mention}'s party.")
+
+
+@bot.command(aliases=['l'])
+async def leave(ctx):
+    player = players[ctx.author.id]
+    if len(player.party) > 1 and player.party.partyLeader == player:
+        player.party.Kick(player)
+
+        await ctx.send(f"{ctx.author.mention} has left the party")
+        await ctx.author.send(f"you have left {player.party.partyLeader.author.mention}'s party.")
+
 
 bot.run(TOKEN)
