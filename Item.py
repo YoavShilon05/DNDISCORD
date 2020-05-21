@@ -1,42 +1,38 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from inspect import iscoroutinefunction, getfullargspec
 from uuid import uuid1
-
-if TYPE_CHECKING:
-    from Inventory import Inventory
+import Functions
 
 
 class Item:
-    def __init__(self, name, inventory : Inventory, **properties):
-        self.inventory = inventory
+    def __init__(self, name, description, fullDescription=None):
+        self.inventory = None
         self.name = name
 
         self.id = uuid1()
 
-        self.shortDescription = properties.get("description", "no description provided")
-        self.longDescription = properties.get("longDescription", self.shortDescription)
+        self.description = description
+        self.fullDescription = fullDescription
 
+    def Preview(self):
+        spaces = 8
+
+        return self.name + spaces * " - " + self.fullDescription
 
 class Usable(Item):
 
-    def __init__(self, name, inventory: Inventory, useFunction, uses: int=1, **properties):
-        if iscoroutinefunction(useFunction):
-            # if num of args of function are or more then 2 (ctx, user)
-            if len(getfullargspec(self.useFunction).args) >= 2:
-                self.useFunction = useFunction
-            else:
-                raise TypeError("Expected 2 Attributes in use function, 1 was given")
+    def __init__(self, name, description, useFunc, uses: int=1, fullDescription=None):
 
-        else:
-            raise Exception("use function is not coroutine")
+        super().__init__(name, description, fullDescription)
 
-        super().__init__(name, inventory, **properties)
-
+        self.useFunc = useFunc
         self.uses = uses
 
-    async def Use(self, ctx, user):
-        await self.useFunction(ctx, user)
+    async def Use(self, channel, user):
+
+        await Functions.CallAction(self.useFunc, channel, user, None)
+        self.uses -= 1
+
+        if self.uses <= 0:
+            self.inventory.RemoveItem(self)
 
 
 

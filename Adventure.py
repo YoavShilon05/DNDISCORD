@@ -1,26 +1,28 @@
 from __future__ import annotations
 from typing import *
-from Room import Room
-from Functions import SpaceFunctionName
-from Action import Action
-from Player import Party, Player
+
 import GlobalVars
 import discord
-from discord.ext import commands
-#import nacl
 import random
 from itertools import cycle
-import functools
+import Action
+import asyncio
+
+if TYPE_CHECKING:
+    import Room
+    import Player
+
 
 class Command:
     def __init__(self, name, action, aliases=[]):
         self.name = name
-        self.action : Action = action
+        self.action : Action.Action = action
         self.aliases = aliases
 
-    async def __call__(self, channel : discord.TextChannel=None, executioner : Player = None):
-        await self.action(channel, executioner)
-        return not self.action.passTurn
+    async def __call__(self, channel : discord.TextChannel, executioner : Player.Player, message=None):
+        await self.action(channel, executioner, message)
+        return self.action.passTurn
+
 
 class Adventure:
 
@@ -29,10 +31,12 @@ class Adventure:
         self.name = name
         self.description = description
         self.rooms = []
-        self.startRoom : Room = None
+        self.startRoom : Room.Room = None
 
         self.minParty = minPartySize
         self.maxParty = maxPartySize
+
+        self.maker = None
 
         for room in self.rooms:
             room.adventure = self
@@ -42,23 +46,44 @@ class Adventure:
         self.useVoice = False
 
         @self.command(aliases=['inventory'])
-        async def inv(ctx, players):
+        async def inv(channel, player, item):
             """show yeer inv"""
-            print("show inv")
+
+            msg = "Inventory\n"
+            if item == None:
+                await channel.send(msg + player.character.inventory.Preview())
+            else:
+                if item.lower() in [i.name.lower() for i in player.character.room.items]:
+                    await channel.send(msg + player.character.room.GetItemByName(item).Preview())
+                else:
+                    await channel.send(msg + "no item by that name was found")
 
         @self.command(aliases=['Toggle Voice'])
-        async def ToggleVoice(channel, player):
+        async def toggle_voice(channel, player):
             adventure = player.adventure
             if player.author.voice and player.author.voice.channel:
                 await adventure.ToggleVoice(player.author.voice.channel)
 
+        @self.command(aliases=['s', 'show_stats'])
+        async def stats(channel, player):
+
+            await channel.send(
+                f'''health : {player.character.health}
+
+                '''
+            )
+
+
         self.vars = {}
-        self.party : Party = None
+        self.party : Player.Party = None
 
         self.playingBackgroundMusic = False
         self.backgroundTrack = ""
 
-    async def Init(self, channel : discord.TextChannel, party : Party):
+    def SetMaker(self, maker : Player.Player):
+        self.maker = maker
+
+    async def Init(self, channel : discord.TextChannel, party : Player.Party):
 
         if (len(party) >= self.minParty or self.minParty == 0) and (len(party) <= self.maxParty or self.minParty == 0):
 
@@ -107,75 +132,78 @@ class Adventure:
                 self.commands.remove(c)
                 return c
 
-    async def ExecuteAction(self, message : discord.Message, executioner : Player):
-        cmd = message.content
+    async def ExecuteAction(self, channel, action : str, executioner : Player.Player):
+
         if executioner not in self.party:
-            raise Exception(f"executioners of {cmd} command not in adventure party")
-        player = self.party[message.author]
-        room = player.character.room
+            raise Exception(f"executioners of {action} command not in adventure party")
 
-        result = None
+        room = executioner.character.room
 
-        if cmd.isnumeric():
-            if int(cmd) - 1 <= len(room.actions) and int(cmd) >= 1:
-                result = await room.actions[int(cmd) - 1](message.channel, executioner)
+        passTurn = None
+
+        if action.isnumeric():
+            if int(action) - 1 <= len(room.actions) and int(action) >= 1:
+                passTurn = await room.numberedActions[int(action) - 1](channel, executioner)
+
+        if passTurn == None:
+            for a in room.actions:
+                if a.name == action:
+                    passTurn = await a(channel, executioner)
 
 
-        for a in room.actions:
-            if a.name == cmd:
-                result = await a(message.channel, executioner)
-
-        if result != None:
-
-            if not result:
+        if type(passTurn) == bool:
+            if not passTurn:
                 self.currentPlayer = next(self.playerTurns)
+                await channel.send(f"turn passes to {self.currentPlayer.author.mention}.\n What will you do?")
+                await asyncio.sleep(2)
+                await channel.send(self.currentPlayer.character.room.GetActionRepr())
 
-            return result
+        return len(room.actions) > 0
 
-    async def ExecuteCommand(self, command : discord.Message, executioner : Player):
-        cmd = command.content
+    async def ExecuteCommand(self, channel, command : str, executioner : Player.Player, message : str):
+
         for c in self.commands:
             commandNames = c.aliases + [c.name]
-            if cmd in commandNames:
-                await c(command.channel, executioner)
+            if command in commandNames:
+                await c(channel, executioner, message)
 
     async def ToggleVoice(self, voiceChannel : discord.VoiceChannel):
 
         self.useVoice = not self.useVoice
         if self.useVoice:
             voiceClient = await voiceChannel.connect()
-            GlobalVars.botVoiceClients[voiceChannel.guild] = voiceClient
+            GlobalVars.botVoiceClients[voiceChannel.guild.id] = voiceClient
 
             if self.playingBackgroundMusic:
-                await self.ResumeBackgroundMusic(voiceClient.guild)
+                self.ResumeBackgroundMusic(voiceClient.guild)
 
         else:
-            voiceClient = GlobalVars.botVoiceClients[voiceChannel.guild]
+            voiceClient = GlobalVars.botVoiceClients[voiceChannel.guild.id]
             await voiceClient.disconnect()
-            GlobalVars.botVoiceClients.pop(voiceChannel.guild)
+            GlobalVars.botVoiceClients.pop(voiceChannel.guild.id)
 
-    def command(self, *, aliases: List[str] = [], condition: Callable[[], bool] = lambda: True, passTurn=False,
-                failFeedback="You can not use this command right now."):
+    def command(self, *, aliases: List[str] = [], passTurn=False):
 
         def decorator(function):
             commandObj = Command(
-                SpaceFunctionName(function.__name__),
-                Action(function.__name__, function.__doc__, function, condition, passTurn, failFeedback),
-                aliases
+                function.__name__,
+                Action.Action(function.__name__, function.__doc__, function, passTurn),
+                aliases,
             )
+
             self.AddCommand(commandObj)
             return commandObj
 
         return decorator
 
-    def AddRoom(self, room : Room):
+    def AddRoom(self, room : Room.Room):
         self.rooms.append(room)
         if self.startRoom == None:
             self.startRoom = room
         room.adventure = self
         return room
 
-    def SetStartRoom(self, room : Room):
+    def SetStartRoom(self, room : Room.Room):
         if room in self.rooms:
             self.startRoom = room
             return room
@@ -186,7 +214,7 @@ class Adventure:
         for r in self.rooms:
             if r.name == name:
                 return r
-            raise Exception("Room not found")
+        raise Exception("Room not found")
 
     def Reset(self):
         self.party = None
@@ -195,7 +223,7 @@ class Adventure:
         self.backgroundTrack = trackName
         self.playingBackgroundMusic = True
         if self.useVoice:
-            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild]
+            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild.id]
             if voiceClient.is_playing():
                 voiceClient.stop()
             voiceClient.play(discord.FFmpegPCMAudio(trackName))
@@ -203,18 +231,23 @@ class Adventure:
     def PauseBackgroundMusic(self, guild):
         self.playingBackgroundMusic = False
         if self.useVoice:
-            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild]
+            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild.id]
             voiceClient.stop()
 
     def ResumeBackgroundMusic(self, guild):
         self.playingBackgroundMusic = True
         if self.useVoice:
-            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild]
+            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild.id]
             voiceClient.play(discord.FFmpegPCMAudio(self.backgroundTrack))
 
     def StopBackgroundMusic(self, guild):
         self.backgroundTrack = ""
         self.playingBackgroundMusic = False
         if self.useVoice:
-            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild]
+            voiceClient: discord.VoiceClient = GlobalVars.botVoiceClients[guild.id]
             voiceClient.stop()
+
+    def End(self):
+
+        for p in self.party:
+            p.character.room = None

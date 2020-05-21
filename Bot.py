@@ -4,9 +4,8 @@ import discord
 from discord.ext import commands
 import dill
 from typing import *
-from copy import deepcopy
+import copy
 import asyncio
-
 
 # GLOBAL VARS ___________________________________________
 bot = commands.Bot(command_prefix="d.")
@@ -15,9 +14,9 @@ GlobalVars.bot = bot
 # FILES _________________________________________________
 import Player
 import Character
-
 import Menu
 import Adventure
+from TEST import AddCurency
 
 TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
         ''
@@ -27,33 +26,33 @@ TOKEN = 'NzA2MjE2OTkxMDA1ODY4MDgz.XrLYFg.VH2-yjc2EPx_Nv9QmFCFuz_9P5o' \
 
 async def MakeCharacter(ctx : commands.Context):
 
-    async def WaitForMsg(startingMsg, failMsg="Your answer is not valid.", condition=lambda m: True):
+    async def WaitForMsg(startingMsg, failMsg="Your answer is not valid.", answerEnum = None, condition=lambda m: True):
 
-        if startingMsg != "":
+        if startingMsg != None and startingMsg != "":
             await ctx.send(startingMsg)
 
         msg = await bot.wait_for('message', check=lambda m: m.author == ctx.author)
-
+        answer = msg.content
         if condition(msg):
-            return startingMsg
-        else:
-            await ctx.send(failMsg)
-            await WaitForMsg("", failMsg, condition)
+            if answerEnum != None:
+                if answer in [e.name for e in answerEnum]:
+                    a = eval(f'answerEnum.{answer}')
+                    return a
+            else:
+                return answer
 
-    racesStr = ""
-    for r in Character.Races:
-        # if race is good / hero race:
-        if r.value[0] == 0:
-            racesStr += r.name + "\n"
+        await ctx.send(failMsg)
+        await WaitForMsg("", failMsg, answerEnum, condition)
 
+    racesStr = '\n'.join([r.name for r in Character.Races])
     professionsStr = '\n'.join([p.name for p in Character.Professions])
 
     newCharacter = Character.Character(
         await WaitForMsg("What is your character's name?"),
         # if the sexes ever change, change that although idk why would they change i mean what?
-        await WaitForMsg("What is your character's sex?\npossible sexes are -\nmale\nfemale\nunknown", condition=lambda m : m.content.lower() in ['male', 'female', 'unknown']),
-        await WaitForMsg("What will your character's race be?\nPossible races are:\n" + racesStr, "Couldn't find that race.", lambda m: m.content.lower() in [r.name.lower() for r in Character.Races]),
-        await WaitForMsg("What will your character's profession be?\nPossible professions are:\n" + professionsStr, "Couldn't find that profession.", lambda m: m.content.lower() in [p.name.lower() for p in Character.Professions]),
+        await WaitForMsg("What is your character's sex?\npossible sexes are -\nmale\nfemale\nunknown", answerEnum=Character.Sexes),
+        await WaitForMsg("What will your character's race be?\nPossible races are:\n" + racesStr, "Couldn't find that race.", Character.Races),
+        await WaitForMsg("What will your character's profession be?\nPossible professions are:\n" + professionsStr, "Couldn't find that profession.", Character.Professions),
         await WaitForMsg("What is your character's backstory?")
 
     )
@@ -66,7 +65,7 @@ def UpdatePlayers():
         dilldPlayers = {}
 
         for authorId, player in players.items():
-            dilldPlayer = deepcopy(player)
+            dilldPlayer = copy.copy(player)
             dilldPlayer.author = None
             dilldPlayer.Reset()
             dilldPlayers[authorId] = dilldPlayer
@@ -110,7 +109,7 @@ async def on_ready():
     adventures = LoadAdventures()
     print("loaded adventures")
 
-
+    AddCurency(329960504376426496, 11)
 
 @bot.command()
 async def get_players(ctx : commands.Context):
@@ -135,9 +134,9 @@ async def StartAdventure(channel, party, adventure : Adventure.Adventure):
         nonlocal Playing
         while Playing:
             msg : discord.Message = await bot.wait_for('message', check= lambda m : m.author.id in players and players[m.author.id] == adventure.currentPlayer)
-            result = await adventure.ExecuteAction(msg, players[msg.author.id])
-            if not result:
-                Playing = False
+            result = await adventure.ExecuteAction(msg.channel, msg.content, players[msg.author.id])
+            #if not result:
+            #    Playing = False
 
     async def ExecuteCommands():
         print("started executing commands")
@@ -147,11 +146,17 @@ async def StartAdventure(channel, party, adventure : Adventure.Adventure):
             adventureCommands.extend(c.aliases)
 
         while Playing:
-            msg: discord.Message = await bot.wait_for('message', check=lambda m: m.author.id in players and players[m.author.id] == adventure.currentPlayer
+            message: discord.Message = await bot.wait_for('message', check=lambda m: m.author.id in players and players[m.author.id] == adventure.currentPlayer
                                                       and m.content in adventureCommands)
-            await adventure.ExecuteCommand(msg, players[msg.author.id])
+            cmd = message.content
+            msg = None
+            if " " in cmd:
+                cmd = cmd.split[' '][0]
+                msg = msg.content.split[' '][1:]
+            await adventure.ExecuteCommand(message.channel, cmd, players[message.author.id], None)
 
     await asyncio.gather(PlayAdventure(), ExecuteCommands())
+    return
 
 async def CommunityAdventures(channel : discord.TextChannel, player : Player.Player):
 
@@ -163,6 +168,10 @@ async def CommunityAdventures(channel : discord.TextChannel, player : Player.Pla
 
     for a in adventures:
         if a not in adventuresPlayed:
+
+            #for p in party:
+            #    p.adventuresPlayed.appemd(a)
+
             await StartAdventure(channel, party, a)
             return
 
@@ -186,7 +195,7 @@ mainMenu = Menu.Menu("Main Menu", "🍆", [campaign, quickPlay, adventureBuilder
 declineInvite = '⛔'
 acceptInvite = '✅'
 
-@bot.command()
+@bot.command(aliases=['play'])
 async def start(ctx : commands.Context):
     if ctx.author.id in players.keys():
         await ctx.send(f"Welcome back {players[ctx.author.id].nickname}!")
@@ -199,14 +208,18 @@ async def start(ctx : commands.Context):
         await asyncio.sleep(1.25)
 
         character = await MakeCharacter(ctx)
-        newPlayer = Player.Player(ctx.author)
-        players[ctx.author.id] = newPlayer
-        GlobalVars.players[ctx.author.id] = newPlayer
-        newPlayer.AddCharacter(character)
-        newPlayer.SetCharacter(newPlayer.characters[0])
+        player = Player.Player(ctx.author)
+        players[ctx.author.id] = player
+        GlobalVars.players[ctx.author.id] = player
+        player.AddCharacter(character)
+        player.SetCharacter(player.characters[0])
         UpdatePlayers()
 
-    await mainMenu.Send(ctx.channel, players[ctx.author.id])
+    if player.party.partyLeader == player:
+        await mainMenu.Send(ctx.channel, players[ctx.author.id])
+
+    else:
+        await ctx.send('you are not the leader of your party. only he can initiate the game.')
 
 
 @bot.command()
@@ -215,6 +228,7 @@ async def debug(ctx):
     player.author = ctx.author
 
     await CommunityAdventures(ctx.channel, player)
+
 
 
 # PARTY COMMANDS _______________________________________________________________________________________________________
@@ -226,27 +240,30 @@ async def inv(ctx : commands.Context, member : discord.Member):
 
     sender = players[ctx.author.id]
 
-    invitation = await member.send(f"{ctx.author.mention} has invited you to a party", delete_after=invitationTimeout)
-    await invitation.add_reaction(acceptInvite)
-    await invitation.add_reaction(declineInvite)
+    if member != sender.author:
 
-    await ctx.send(f"Invited {member.mention} to the party.")
+        invitation = await member.send(f"{ctx.author.mention} has invited you to a party", delete_after=invitationTimeout)
+        await invitation.add_reaction(acceptInvite)
+        await invitation.add_reaction(declineInvite)
 
-    reaction, user = await bot.wait_for('reaction_add', check=lambda r, u : r.emoji == acceptInvite or r.emoji == declineInvite, timeout=invitationTimeout)
+        await ctx.send(f"Invited {member.mention} to the party.")
 
-    try:
-        await invitation.delete()
-    except commands.CommandInvokeError:
-        await ctx.send(f"the invitation for {user.mention} has expired")
+        reaction, user = await bot.wait_for('reaction_add', check=lambda r, u : r.emoji == acceptInvite or r.emoji == declineInvite, timeout=invitationTimeout)
 
-    receiver = players[user.id]
+        try:
+            await invitation.delete()
+        except commands.CommandInvokeError:
+            await ctx.send(f"the invitation for {user.mention} has expired")
 
-    if reaction.emoji == acceptInvite:
-        sender.party.AddPlayer(receiver)
-        await ctx.send(f"{user.mention} has joined your party!")
+        receiver = players[user.id]
+
+        if reaction.emoji == acceptInvite:
+            sender.party.AddPlayer(receiver)
+            await ctx.send(f"{user.mention} has joined your party!")
+        else:
+            await ctx.send(f"{user.mention} has declined your party invitation")
     else:
-        await ctx.send(f"{user.mention} has declined your party invitation")
-
+        await ctx.send('you can not invite yourself!')
 
 @bot.command(aliases=['p'])
 async def party(ctx):
@@ -257,7 +274,7 @@ async def party(ctx):
 @bot.command(aliases=['k'])
 async def kick(ctx, member : discord.Member):
     player = players[ctx.author.id]
-    if len(player.party) > 1 and player.party.partyLeader == player:
+    if len(player.party) > 1 and player.party.partyLeader == player and member != player.author:
         player.party.Kick(players[member.id])
 
         await ctx.send(f"kicked {member.mention} from the party")
