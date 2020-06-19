@@ -1,0 +1,4 @@
+C:\Users\Windows 10\Desktop\junk\C#\projects\discord\CSDNDISCORD\bin\Debug\netcoreapp3.1\CSDNDISCORD.exe
+C:\Users\Windows 10\Desktop\junk\C#\projects\discord\CSDNDISCORD\obj\Debug\netcoreapp3.1\CSDNDISCORD.csprojAssemblyReference.cache
+C:\Users\Windows 10\Desktop\junk\C#\projects\discord\CSDNDISCORD\obj\Debug\netcoreapp3.1\CSDNDISCORD.AssemblyInfoInputs.cache
+C:\Users\Windows 10\Desktop\junk\C#\projects\discord\CSDNDISCORD\obj\Debug\netcoreapp3.1\CSDNDISCORD.AssemblyInfo.cs
