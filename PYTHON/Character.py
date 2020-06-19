@@ -1,3 +1,8 @@
+
+"""
+this file contains classes that the charcter is built out of.
+"""
+
 from __future__ import annotations
 import enum
 import Adventure
@@ -309,67 +314,4 @@ class Weapon(Item):
 
         return damage
 
-class Battle:
-
-    def __init__(self, enemies : List[Character]):
-
-        self.heroes : List[Character] = []
-        self.enemies : List[Character] = enemies
-
-        self.heroCycle : cycle = cycle([])
-        self.currentHero : Character = None
-        self.loot = []
-
-        for e in self.enemies:
-            self.loot.extend(e.inventory.items)
-
-        self.room : Adventure.Room = None
-
-    async def Init(self, heroes : List[Character]):
-        self.heroes = heroes
-
-        self.heroCycle = cycle(self.heroes)
-        self.PassTurn()
-
-        while len(self.enemies) > 0:
-            await self.Act(self.currentHero)
-
-        self.room.items.extend(self.loot)
-
-
-    def PassTurn(self):
-        self.currentHero = next(self.heroCycle)
-
-    async def Act(self, actor : Character):
-
-        if actor.player != None:
-
-            channel : discord.TextChannel = actor.player.adventure.channel
-
-            async def Attack(attacker : Character):
-                await channel.send("enemies:\n" + "\n".join([e.name for e in self.enemies]))
-                msg = await GlobalVars.bot.wait_for('message', check=lambda m : m.author == attacker.player.author and
-                                                                                m.content in [e.name for e in self.enemies])
-
-                enemy = [e for e in self.enemies if e.name == msg.content][0]
-                damage = await attacker.Attack(enemy)
-                if enemy.dead:
-                    self.enemies.remove(enemy)
-                    await channel.send(f"killed {enemy.name}")
-                else:
-                    await channel.send(f"dealt {damage} damage to {enemy.name}.")
-
-            async def Pass(character : Character):
-                pass
-
-            possibleMoves = {
-                "attack" : Attack,
-                "pass" : Pass
-            }
-
-            await channel.send("possible moves:\n" + "\n".join(possibleMoves.keys()))
-            msg = await GlobalVars.bot.wait_for('message', check=lambda m : m.content in possibleMoves.keys() and m.author == actor.player.author)
-
-            await possibleMoves[msg.content](actor)
-            self.PassTurn()
 

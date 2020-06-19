@@ -1,3 +1,17 @@
+
+"""
+Welcome to the DNDISCORD program!
+
+the DNDISCORD program is a discord bot meant to play games that resemble text-based DND, and in the future - make ones!
+DNDISCORD is not a console application, it is a code that runs a bot on the discord app.
+
+the DNDISCORD program is still in development and might have some bugs and incomplete sections.
+
+this file is the combination of all other classes and files, it runs the code in real time.
+"""
+
+
+
 #EXTERNAL LIBRARIES ______________________________________
 import GlobalVars
 import discord

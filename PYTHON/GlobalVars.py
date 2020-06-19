@@ -1,16 +1,9 @@
+
+"""this file conatins global variables and functions to be used and get in all files."""
+
 from discord.ext.commands import Bot
 import discord
 from typing import *
-
-
-class a:
-
-    b = 323
-
-    @staticmethod
-    def A():
-        print(a.b)
-
 
 
 bot : Bot = None

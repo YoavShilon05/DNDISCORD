@@ -1,3 +1,7 @@
+"""
+this file contains the menu class, which is a blueprint for making the start menus.
+"""
+
 import discord
 import GlobalVars
 from typing import Callable, List, Awaitable

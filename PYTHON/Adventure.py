@@ -1,3 +1,6 @@
+
+"""this file contains classes that build up the adventure and the world surrounding it."""
+
 from __future__ import annotations
 from typing import *
 import GlobalVars
@@ -11,6 +14,8 @@ import copy
 from collections import deque
 
 class Action:
+
+    """An action that can be executed by the player if in the room containing it."""
 
     def __init__(self, name : str, description : str, action : Callable, condition= lambda p : True):
         self.name : str = name
@@ -46,6 +51,7 @@ class SequenceItem:
         self.track : str = track
 
 class Sequence:
+    """a sequence of text that will be sent on the channel."""
     def __init__(self, items : List[SequenceItem]):
         self.waitForReaction : bool = True
         self.sequence : List[SequenceItem] = items
@@ -88,6 +94,7 @@ class Sequence:
             adventure.ResumeBackgroundMusic()
 
 class Command:
+    """commands are actions that could be executed at all times by the player, no conditions."""
     def __init__(self, name : str, description : str, action : Callable[[Player.Player, str], Awaitable[bool]], aliases : List[str] = []):
         self.name : str = name
         self.description : str = description
@@ -99,6 +106,9 @@ class Command:
         return passTurn
 
 class Room:
+
+    """Rooms are the building blocks of the adventure.
+    each rooms contains a list of actions that can be executed by the player and other data."""
 
     def __init__(self, name : str, description : Sequence, shortDescription : Sequence = None,
                  cutScene : Sequence = None, items : List[Character.Item] = [], battle : Character.Battle=None):
@@ -283,6 +293,69 @@ class Room:
     #            if a.name == action:
     #                return await a(player)
 
+class Battle:
+
+    def __init__(self, enemies : List[Character.Character]):
+
+        self.heroes : List[Character.Character] = []
+        self.enemies : List[Character.Character] = enemies
+
+        self.heroCycle : cycle = cycle([])
+        self.currentHero : Character = None
+        self.loot = []
+
+        for e in self.enemies:
+            self.loot.extend(e.inventory.items)
+
+        self.room : Room = None
+
+    async def Init(self, heroes : List[Character.Character]):
+        self.heroes = heroes
+
+        self.heroCycle = cycle(self.heroes)
+        self.PassTurn()
+
+        while len(self.enemies) > 0:
+            await self.Act(self.currentHero)
+
+        self.room.items.extend(self.loot)
+
+
+    def PassTurn(self):
+        self.currentHero = next(self.heroCycle)
+
+    async def Act(self, actor : Character.Character):
+
+        if actor.player != None:
+
+            channel : discord.TextChannel = actor.player.adventure.channel
+
+            async def Attack(attacker : Character):
+                await channel.send("enemies:\n" + "\n".join([e.name for e in self.enemies]))
+                msg = await GlobalVars.bot.wait_for('message', check=lambda m : m.author == attacker.player.author and
+                                                                                m.content in [e.name for e in self.enemies])
+
+                enemy = [e for e in self.enemies if e.name == msg.content][0]
+                damage = await attacker.Attack(enemy)
+                if enemy.dead:
+                    self.enemies.remove(enemy)
+                    await channel.send(f"killed {enemy.name}")
+                else:
+                    await channel.send(f"dealt {damage} damage to {enemy.name}.")
+
+            async def Pass(character : Character.Character):
+                pass
+
+            possibleMoves = {
+                "attack" : Attack,
+                "pass" : Pass
+            }
+
+            await channel.send("possible moves:\n" + "\n".join(possibleMoves.keys()))
+            msg = await GlobalVars.bot.wait_for('message', check=lambda m : m.content in possibleMoves.keys() and m.author == actor.player.author)
+
+            await possibleMoves[msg.content](actor)
+            self.PassTurn()
 
 
 #SHOP -- IDEA SCRAPPED FOR NOW.
@@ -375,6 +448,9 @@ class  RoomNode:
 """
 
 class Adventure:
+
+    """contains data on the class and all of the rooms that build it up.
+    also contains methods that can be executed on the adventure."""
 
     def __init__(self, name : str, description : str, author : Player.Player, minPartySize : int, maxPartySize : int, rooms : List[Room] = None, subtitle : str = "") -> None:
 

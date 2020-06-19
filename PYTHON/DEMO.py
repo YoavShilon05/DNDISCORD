@@ -1,3 +1,9 @@
+
+"""
+this is a demo adventure for the bot.
+in the end of the file it is written into the "Adventures.dat" file so it can be loaded up in Bot.py
+"""
+
 from discord.ext import commands
 import GlobalVars
 import dill

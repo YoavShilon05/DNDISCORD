@@ -1,3 +1,6 @@
+
+"""this file contains classes that have to do with the Player object"""
+
 from __future__ import annotations
 from typing import *
 import discord
@@ -7,6 +10,10 @@ import Character
 import Adventure
 
 class Player:
+
+    """
+    contains info and methods on the player, his history, and current data.
+    """
 
     def __init__(self, author : discord.Member):
 
